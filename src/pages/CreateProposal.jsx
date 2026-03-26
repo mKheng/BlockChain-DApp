@@ -368,7 +368,7 @@ export default function AdminPanel() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-text-muted text-xs font-mono">ID #{c.id}</span>
-                  <span className="text-white text-sm font-bold">{c.phiếu.toLocaleString()} phiếu</span>
+                  <span className="text-white text-sm font-bold">{c.votes.toLocaleString()} phiếu</span>
                 </div>
               </div>
             ))}

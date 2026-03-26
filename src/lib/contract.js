@@ -10,7 +10,7 @@
 //   Remix IDE → tab Solidity Compiler → "Compilation Details" → copy "ABI"
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CONTRACT_ADDRESS = '0x8475Ed6b22E1ff6161eaAB3a4FF34981bdA0d616' // ← Điền địa chỉ contract MỚI sau khi redeploy
+export const CONTRACT_ADDRESS = '0xCdA876f0Be6995C2Ad9798AE40128C1B0B9C13e3' // ← Điền địa chỉ contract MỚI sau khi redeploy
 
 export const CONTRACT_ABI = [
   // ── Constructor ─────────────────────────────────────────────────────────────
