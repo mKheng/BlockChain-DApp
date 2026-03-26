@@ -127,6 +127,9 @@ Contract `Voting.sol` bao gồm:
 ## Thành viên nhóm
 
 <!-- Thêm tên thành viên tại đây -->
+Võ Minh Khang - 23162041
+Nguyễn Thành Tâm - 23162087
+Trịnh Bảo Toàn - 23162103
 
 ## License
 
