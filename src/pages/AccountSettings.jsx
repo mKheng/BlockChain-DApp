@@ -41,7 +41,7 @@ function SettingRow({ label, desc, action }) {
 }
 
 export default function AccountSettings() {
-  const { walletState, walletAddress, onConnectWallet } = useOutletContext()
+  const { walletState, walletAddress, onConnectWallet, onDisconnectWallet } = useOutletContext()
   const [copied, setCopied] = useState(false)
   const [language, setLanguage] = useState('English')
   const [notifications, setNotifications] = useState({
@@ -108,7 +108,10 @@ export default function AccountSettings() {
               }
             />
             <div className="pt-1 border-t border-border">
-              <button className="flex items-center gap-2 text-red-400 text-sm hover:text-red-300 transition-colors font-medium cursor-pointer">
+              <button
+                onClick={onDisconnectWallet}
+                className="flex items-center gap-2 text-red-400 text-sm hover:text-red-300 transition-colors font-medium cursor-pointer"
+              >
                 <LogOut className="w-4 h-4" />
                 Ngắt kết nối ví
               </button>
