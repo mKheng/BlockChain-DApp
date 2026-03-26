@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-surface-900 text-text-primary font-sans antialiased;
+    margin: 0;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-surface-800;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border-zincLight rounded-full;
+  }
+}
+
+@layer components {
+  /* Card */
+  .card {
+    @apply bg-surface-600 border border-border rounded-xl;
+  }
+
+  /* Pill badges */
+  .badge-active {
+    @apply bg-green-chain/10 text-green-chain text-xs font-medium px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+  }
+  .badge-closed {
+    @apply bg-white/5 text-text-muted text-xs font-medium px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+  }
+  .badge-pending {
+    @apply bg-amber-chain/10 text-amber-chain text-xs font-medium px-2.5 py-1 rounded-full inline-flex items-center gap-1.5;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply bg-brand text-white font-semibold rounded-lg px-5 py-2.5 text-sm
+           hover:bg-brand-hover active:scale-[0.98] transition-all duration-150
+           flex items-center gap-2 cursor-pointer;
+  }
+
+  .btn-ghost {
+    @apply border border-border text-text-secondary font-medium rounded-lg px-4 py-2 text-sm
+           hover:bg-white/[0.04] hover:text-text-primary transition-colors duration-150
+           flex items-center gap-2 cursor-pointer;
+  }
+
+  /* Progress bar */
+  .progress-track {
+    @apply bg-white/[0.06] h-1.5 rounded-full overflow-hidden;
+  }
+  .progress-fill {
+    @apply bg-brand h-full rounded-full transition-all duration-500;
+  }
+
+  /* Table row hover */
+  .table-row-hover {
+    @apply hover:bg-white/[0.03] transition-colors duration-100;
+  }
+}
