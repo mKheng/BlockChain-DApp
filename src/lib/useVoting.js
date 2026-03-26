@@ -134,6 +134,10 @@ export function useVoting() {
     setWalletState('connecting')
     try {
       const provider = getProvider()
+      
+      // Buộc MetaMask hiển thị bảng chọn tài khoản bằng cách yêu cầu permissions
+      await provider.send("wallet_requestPermissions", [{ eth_accounts: {} }])
+      
       const accounts = await provider.send('eth_requestAccounts', [])
       const address = accounts[0]
       setWalletAddress(address)
@@ -148,12 +152,17 @@ export function useVoting() {
 
   // ── Disconnect ─────────────────────────────────────────────────────────────
   const disconnectWallet = useCallback(() => {
-    setWalletState('disconnected')
+    localStorage.setItem('wallet_disconnected', 'true')
     setWalletAddress('')
     setIsOwner(false)
     setUserVotedFor(null)
     setVoteHistory([])
-    localStorage.setItem('wallet_disconnected', 'true')
+    
+    // Delay setting state to 'disconnected' to avoid UI click-through races
+    setTimeout(() => {
+      setWalletState('disconnected')
+    }, 100)
+
     fetchData(null)
   }, [fetchData])
 
@@ -231,7 +240,10 @@ export function useVoting() {
   // ── Auto-reconnect ─────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      if (!window.ethereum) { await fetchData(null); return }
+      if (!window.ethereum) { 
+        await fetchData(null)
+        return 
+      }
       
       const isManualDisconnect = localStorage.getItem('wallet_disconnected') === 'true'
       if (isManualDisconnect) {
@@ -250,11 +262,16 @@ export function useVoting() {
         } else {
           await fetchData(null)
         }
-      } catch { await fetchData(null) }
+      } catch (err) { 
+        await fetchData(null) 
+      }
     }
     init()
 
     const onAccountsChanged = (accounts) => {
+      const isManualDisconnect = localStorage.getItem('wallet_disconnected') === 'true'
+      if (isManualDisconnect) return
+
       if (accounts.length === 0) {
         setWalletState('disconnected')
         setWalletAddress('')

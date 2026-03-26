@@ -39,6 +39,7 @@ export default function Layout() {
             userVotedFor, totalVotesCast, voteHistory,
             loadingData, contractError,
             onConnectWallet: connectWallet,
+            onDisconnectWallet: disconnectWallet,
             castVote, registerCandidate, setVotingStatus, setRegistrationStatus, registerVoter,
             refreshData,
           }} />
