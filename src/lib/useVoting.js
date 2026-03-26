@@ -138,6 +138,7 @@ export function useVoting() {
       const address = accounts[0]
       setWalletAddress(address)
       setWalletState('connected')
+      localStorage.setItem('wallet_disconnected', 'false')
       await fetchData(address)
     } catch (err) {
       console.error('[useVoting] connectWallet error:', err)
@@ -152,6 +153,7 @@ export function useVoting() {
     setIsOwner(false)
     setUserVotedFor(null)
     setVoteHistory([])
+    localStorage.setItem('wallet_disconnected', 'true')
     fetchData(null)
   }, [fetchData])
 
@@ -230,6 +232,13 @@ export function useVoting() {
   useEffect(() => {
     const init = async () => {
       if (!window.ethereum) { await fetchData(null); return }
+      
+      const isManualDisconnect = localStorage.getItem('wallet_disconnected') === 'true'
+      if (isManualDisconnect) {
+        await fetchData(null)
+        return
+      }
+
       try {
         const provider = getProvider()
         const accounts = await provider.listAccounts()
