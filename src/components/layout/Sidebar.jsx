@@ -77,7 +77,7 @@ export default function Sidebar({ isOwner, walletConnected, walletAddress, elect
             <NavItem to={base} icon={Home} label="Tổng quan" end />
             {isOwner && <NavItem to={`${base}/manage`} icon={Shield} label="Quản trị" />}
             {!isOwner && <NavItem to={`${base}/register`} icon={UserCheck} label="Đăng ký Cử tri" />}
-            <NavItem to={`${base}/history`} icon={Vote} label="Phiếu của tôi" />
+            {!isOwner && <NavItem to={`${base}/history`} icon={Vote} label="Phiếu của tôi" />}
             <NavItem to={`${base}/results`} icon={BarChart2} label="Kết quả" />
           </>
         ) : (

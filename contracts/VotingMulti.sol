@@ -11,6 +11,8 @@ contract VotingMulti {
         uint256 startTime;
         uint256 endTime;
         uint256 candidateCount;
+        uint256 voterCount;
+        bytes32 inviteCodeHash;
         bool exists;
     }
 
@@ -67,7 +69,8 @@ contract VotingMulti {
         string memory _name,
         string memory _description,
         uint256 _startTime,
-        uint256 _endTime
+        uint256 _endTime,
+        bytes32 _inviteCodeHash
     ) public onlyOwner {
         require(_endTime > _startTime, "endTime phai lon hon startTime");
 
@@ -79,6 +82,8 @@ contract VotingMulti {
             startTime: _startTime,
             endTime: _endTime,
             candidateCount: 0,
+            voterCount: 0,
+            inviteCodeHash: _inviteCodeHash,
             exists: true
         });
 
@@ -123,6 +128,10 @@ contract VotingMulti {
         );
     }
 
+    function getVoterCount(uint256 _electionId) public view returns (uint256) {
+        return elections[_electionId].voterCount;
+    }
+
     // ── Candidate Management ────────────────────────────────────────────────────
 
     function addCandidate(
@@ -148,17 +157,20 @@ contract VotingMulti {
 
     // ── Voter Registration ──────────────────────────────────────────────────────
 
-    function registerVoter(uint256 _electionId, bytes32 _cccdHash) public {
+    function registerVoter(uint256 _electionId, bytes32 _cccdHash, bytes32 _inviteCodeHash) public {
         Election storage e = elections[_electionId];
+        require(msg.sender != owner, "Owner khong duoc phep dang ky cu tri");
         require(e.exists, "Cuoc bau cu khong ton tai");
         require(block.timestamp >= e.startTime, "Chua den thoi gian dang ky");
         require(block.timestamp <= e.endTime, "Da het thoi gian dang ky");
+        require(_inviteCodeHash == e.inviteCodeHash, "Ma moi khong chinh xac");
         require(!isRegistered[_electionId][msg.sender], "Da dang ky roi");
         require(!cccdUsed[_electionId][_cccdHash], "CCCD da duoc su dung trong cuoc bau cu nay");
 
         isRegistered[_electionId][msg.sender] = true;
         voterCCCD[_electionId][msg.sender] = _cccdHash;
         cccdUsed[_electionId][_cccdHash] = true;
+        e.voterCount++;
 
         emit VoterRegistered(_electionId, msg.sender, _cccdHash);
     }
