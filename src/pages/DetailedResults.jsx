@@ -71,12 +71,17 @@ export default function DetailedResults() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: 'Tổng phiếu', value: loadingData ? '...' : totalVotesCast.toLocaleString(), sub: 'Tổng số phiếu đã bỏ' },
-          { label: 'Ứng cử viên', value: loadingData ? '...' : candidates.length.toString(), sub: 'Đã đăng ký' },
-          { label: 'Trạng thái', value: statusLabel[elStatus], sub: currentElection ? formatDate(currentElection.endTime) : '—', valueColor: elStatus === 1 ? 'text-green-chain' : undefined },
-        ].map((s) => (
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {(() => {
+          const voterCount = currentElection?.voterCount ?? 0
+          const turnout = voterCount > 0 ? Math.round((totalVotesCast / voterCount) * 100) : 0
+          return [
+            { label: 'Tổng phiếu', value: loadingData ? '...' : totalVotesCast.toLocaleString(), sub: `Trên ${candidates.length} ứng cử viên` },
+            { label: 'Cử tri đăng ký', value: loadingData ? '...' : voterCount.toLocaleString(), sub: `${totalVotesCast}/${voterCount} đã bỏ phiếu` },
+            { label: 'Tỷ lệ tham gia', value: loadingData ? '...' : `${turnout}%`, sub: voterCount > 0 ? `${voterCount - totalVotesCast} chưa bỏ phiếu` : 'Chưa có cử tri', valueColor: turnout >= 70 ? 'text-green-chain' : turnout >= 40 ? 'text-amber-chain' : undefined },
+            { label: 'Trạng thái', value: statusLabel[elStatus], sub: currentElection ? formatDate(currentElection.endTime) : '—', valueColor: elStatus === 1 ? 'text-green-chain' : undefined },
+          ]
+        })().map((s) => (
           <div key={s.label} className="bg-surface-600 border border-border rounded-xl p-4">
             <p className="text-text-muted text-xs">{s.label}</p>
             <p className={clsx('font-bold text-xl tracking-tight mt-1', s.valueColor ?? 'text-text-primary')}>{s.value}</p>

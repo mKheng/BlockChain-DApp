@@ -8,7 +8,7 @@
 // BƯỚC 3: ABI đã được cập nhật sẵn cho VotingMulti.sol
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CONTRACT_ADDRESS = '0xc82Df3BE1816bC541BF3FC414fA412849e858488' // ← Điền địa chỉ contract MỚI sau khi deploy VotingMulti.sol
+export const CONTRACT_ADDRESS = '0x9B31BE410EF8D1f954315fEE591900ca4A23D4e3' // ← Điền địa chỉ contract MỚI sau khi deploy VotingMulti.sol
 
 export const CONTRACT_ABI = [
   // ── Constructor ─────────────────────────────────────────────────────────────
@@ -104,6 +104,13 @@ export const CONTRACT_ABI = [
   },
   {
     inputs: [{ internalType: 'uint256', name: '_electionId', type: 'uint256' }],
+    name: 'getVoterCount',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: '_electionId', type: 'uint256' }],
     name: 'getElectionResults',
     outputs: [
       { internalType: 'uint256[]', name: 'ids', type: 'uint256[]' },
@@ -152,6 +159,7 @@ export const CONTRACT_ABI = [
       { internalType: 'string', name: '_description', type: 'string' },
       { internalType: 'uint256', name: '_startTime', type: 'uint256' },
       { internalType: 'uint256', name: '_endTime', type: 'uint256' },
+      { internalType: 'bytes32', name: '_inviteCodeHash', type: 'bytes32' },
     ],
     name: 'createElection',
     outputs: [],
@@ -180,6 +188,7 @@ export const CONTRACT_ABI = [
     inputs: [
       { internalType: 'uint256', name: '_electionId', type: 'uint256' },
       { internalType: 'bytes32', name: '_cccdHash', type: 'bytes32' },
+      { internalType: 'bytes32', name: '_inviteCodeHash', type: 'bytes32' },
     ],
     name: 'registerVoter',
     outputs: [],

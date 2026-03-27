@@ -32,7 +32,7 @@ export default function CreateElection() {
 
   const navigate = useNavigate()
 
-  const [form, setForm] = useState({ name: '', description: '', startTime: '', endTime: '' })
+  const [form, setForm] = useState({ name: '', description: '', startTime: '', endTime: '', inviteCode: '' })
   const [formError, setFormError] = useState({})
   const [txState, setTxState] = useState('idle')
   const [txHash, setTxHash] = useState('')
@@ -42,6 +42,7 @@ export default function CreateElection() {
   const validate = () => {
     const e = {}
     if (!form.name.trim()) e.name = 'Vui lòng nhập tên cuộc bầu cử'
+    if (!form.inviteCode.trim()) e.inviteCode = 'Vui lòng nhập mã mời'
     if (!form.startTime) e.startTime = 'Vui lòng chọn thời gian bắt đầu'
     if (!form.endTime) e.endTime = 'Vui lòng chọn thời gian kết thúc'
     if (form.startTime && form.endTime && new Date(form.startTime) >= new Date(form.endTime)) {
@@ -62,7 +63,7 @@ export default function CreateElection() {
     setTxState('signing')
     const startTs = Math.floor(new Date(form.startTime).getTime() / 1000)
     const endTs = Math.floor(new Date(form.endTime).getTime() / 1000)
-    const result = await createElection(form.name.trim(), form.description.trim(), startTs, endTs, {
+    const result = await createElection(form.name.trim(), form.description.trim(), startTs, endTs, form.inviteCode.trim(), {
       onPending: () => setTxState('pending'),
     })
     if (result.success) {
@@ -165,6 +166,22 @@ export default function CreateElection() {
                 rows={3}
                 className={clsx(fieldCls('description'), 'resize-none')}
               />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-text-secondary text-sm font-medium">
+                Mã mời <span className="text-red-400">*</span>
+              </label>
+              <input
+                value={form.inviteCode}
+                onChange={(e) => setForm((f) => ({ ...f, inviteCode: e.target.value }))}
+                placeholder="vd: BAUCUKHOA2026"
+                className={fieldCls('inviteCode')}
+              />
+              {formError.inviteCode
+                ? <p className="text-red-400 text-xs">{formError.inviteCode}</p>
+                : <p className="text-text-muted text-xs">Mã mời để cử tri đăng ký tham gia. Chia sẻ mã này cho người được mời.</p>
+              }
             </div>
 
             {/* Quick duration presets */}

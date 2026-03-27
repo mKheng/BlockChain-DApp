@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
-  UserCheck, Wallet, Lock, CheckCircle2, AlertTriangle, X, ShieldCheck, Clock,
+  UserCheck, Wallet, Lock, CheckCircle2, AlertTriangle, X, ShieldCheck, Shield, Clock,
 } from 'lucide-react'
 import clsx from 'clsx'
 import ConfirmTransactionModal from '../components/modals/ConfirmTransactionModal'
@@ -20,12 +20,14 @@ function ErrorBanner({ error, onDismiss }) {
 export default function RegisterVoter() {
   const {
     walletState, walletAddress, electionId,
-    currentElection, isRegistered,
+    currentElection, isRegistered, isOwner,
     onConnectWallet, registerVoter,
   } = useOutletContext()
 
-  const [cccd, setCccd]           = useState('')
-  const [cccdError, setCccdError] = useState('')
+  const [cccd, setCccd]               = useState('')
+  const [cccdError, setCccdError]     = useState('')
+  const [inviteCode, setInviteCode]   = useState('')
+  const [inviteError, setInviteError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [txState, setTxState]     = useState('idle')
   const [txHash, setTxHash]       = useState('')
@@ -35,10 +37,12 @@ export default function RegisterVoter() {
   const isActive = elStatus === 1
 
   const validate = () => {
-    if (!cccd.trim()) { setCccdError('Vui lòng nhập số CCCD'); return false }
-    if (!/^\d{12}$/.test(cccd.trim())) { setCccdError('CCCD phải gồm đúng 12 chữ số'); return false }
-    setCccdError('')
-    return true
+    let valid = true
+    if (!inviteCode.trim()) { setInviteError('Vui lòng nhập mã mời'); valid = false } else { setInviteError('') }
+    if (!cccd.trim()) { setCccdError('Vui lòng nhập số CCCD'); valid = false }
+    else if (!/^\d{12}$/.test(cccd.trim())) { setCccdError('CCCD phải gồm đúng 12 chữ số'); valid = false }
+    else { setCccdError('') }
+    return valid
   }
 
   const handleSubmit = (e) => {
@@ -50,7 +54,7 @@ export default function RegisterVoter() {
 
   const handleConfirm = async () => {
     setTxState('signing')
-    const result = await registerVoter(electionId, cccd.trim(), {
+    const result = await registerVoter(electionId, cccd.trim(), inviteCode.trim(), {
       onPending: () => setTxState('pending'),
     })
     if (result.success) {
@@ -77,6 +81,23 @@ export default function RegisterVoter() {
             Kết nối MetaMask để đăng ký tư cách cử tri. Mỗi ví chỉ được liên kết với một CCCD.
           </p>
           <button onClick={onConnectWallet} className="btn-primary mt-1">Kết nối ví</button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Owner không được đăng ký
+  if (isOwner) {
+    return (
+      <div className="p-6 lg:p-8 max-w-xl mx-auto w-full">
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center">
+            <Shield className="w-6 h-6 text-amber-400" />
+          </div>
+          <h2 className="text-text-primary font-bold text-lg">Người tổ chức không được bỏ phiếu</h2>
+          <p className="text-text-muted text-sm max-w-sm">
+            Để đảm bảo tính công bằng, người tổ chức bầu cử không được phép đăng ký cử tri và tham gia bỏ phiếu.
+          </p>
         </div>
       </div>
     )
@@ -170,6 +191,26 @@ export default function RegisterVoter() {
               <div className="w-full bg-surface-800 text-text-muted text-xs font-mono rounded-lg px-4 py-2.5 border border-border truncate">
                 {walletAddress}
               </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-text-secondary text-sm font-medium">
+                Mã mời <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                placeholder="Nhập mã mời từ người tổ chức"
+                className={clsx(
+                  'w-full bg-surface-800 text-text-primary text-sm rounded-lg px-4 py-2.5 outline-none border transition-colors',
+                  inviteError ? 'border-red-500/40 focus:border-red-500' : 'border-border focus:border-brand/40',
+                )}
+              />
+              {inviteError
+                ? <p className="text-red-400 text-xs">{inviteError}</p>
+                : <p className="text-text-muted text-xs">Mã mời do người tổ chức bầu cử cung cấp</p>
+              }
             </div>
 
             <div className="flex flex-col gap-2">

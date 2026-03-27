@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useOutletContext, Link } from 'react-router-dom'
 import {
-  Users, Vote, Zap, TrendingUp, Copy, Check,
+  Users, Vote, Zap, TrendingUp, Check,
   X, AlertTriangle, RefreshCw, CheckCircle2, UserCheck,
   Shield, Plus, Clock,
 } from 'lucide-react'
@@ -71,14 +71,6 @@ function CandidateSkeleton() {
 
 // ── Candidate card ───────────────────────────────────────────────────────────
 function CandidateCard({ candidate: c, isVotedByUser, onVote }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(CONTRACT_ADDRESS)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
-
   return (
     <div
       className={clsx(
@@ -123,13 +115,9 @@ function CandidateCard({ candidate: c, isVotedByUser, onVote }) {
           <VoteProgressBar value={c.votes} total={c.totalVotes} className="w-full" />
         </div>
 
-        <button
-          onClick={handleCopy}
-          className="hidden sm:flex items-center gap-1.5 text-text-muted text-[11px] font-mono bg-surface-400 hover:bg-surface-400/70 rounded-lg px-2.5 py-1.5 transition-colors cursor-pointer"
-        >
-          {c.blockchainId}
-          {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-        </button>
+        <span className="hidden sm:flex items-center text-text-muted text-[11px] font-mono bg-surface-400 rounded-lg px-2.5 py-1.5">
+          #{c.id}
+        </span>
 
         <div className="shrink-0 w-[88px] flex justify-end">
           {c.status === 'closed' ? (
@@ -236,7 +224,7 @@ export default function Dashboard() {
       {/* Banners */}
       {contractNotReady && <SetupBanner error={contractError} />}
 
-      {walletState === 'connected' && !isRegistered && !contractNotReady && isActive && (
+      {walletState === 'connected' && !isOwner && !isRegistered && !contractNotReady && isActive && (
         <div className="flex items-center gap-3 bg-brand-dim border border-brand/15 rounded-xl px-4 py-3">
           <UserCheck className="w-4 h-4 text-brand shrink-0" />
           <p className="text-text-secondary text-sm flex-1">
@@ -283,18 +271,20 @@ export default function Dashboard() {
           title={walletState === 'connected' ? 'Tư cách' : 'Quyền bầu cử'}
           value={
             walletState !== 'connected' ? '—'
+            : isOwner ? 'Người tổ chức'
             : userVotedFor ? 'Đã bầu'
             : isRegistered ? 'Sẵn sàng'
             : 'Chưa xác minh'
           }
           subtitle={
-            userVotedCandidate ? `Đã bầu cho ${userVotedCandidate.name}`
-            : walletState === 'connected' && isRegistered ? 'Đủ điều kiện bỏ phiếu'
-            : walletState === 'connected' ? 'Đăng ký bằng CCCD'
-            : 'Kết nối ví để bỏ phiếu'
+            walletState !== 'connected' ? 'Kết nối ví để bỏ phiếu'
+            : isOwner ? 'Quản trị cuộc bầu cử'
+            : userVotedCandidate ? `Đã bầu cho ${userVotedCandidate.name}`
+            : isRegistered ? 'Đủ điều kiện bỏ phiếu'
+            : 'Đăng ký bằng CCCD'
           }
           icon={Zap}
-          subtitleColor={userVotedFor ? 'text-emerald-400' : undefined}
+          subtitleColor={isOwner ? 'text-amber-400' : userVotedFor ? 'text-emerald-400' : undefined}
         />
       </div>
 

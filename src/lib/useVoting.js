@@ -30,18 +30,60 @@ async function getContract(withSigner = false) {
   return new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider)
 }
 
+// Map contract revert reasons to user-friendly Vietnamese messages
+const ERROR_MAP = {
+  'Ma moi khong chinh xac': 'Mã mời không chính xác. Vui lòng kiểm tra lại.',
+  'Da dang ky roi': 'Ví này đã đăng ký cử tri rồi.',
+  'CCCD da duoc su dung trong cuoc bau cu nay': 'Số CCCD này đã được sử dụng trong cuộc bầu cử này.',
+  'Chua den thoi gian dang ky': 'Chưa đến thời gian đăng ký.',
+  'Da het thoi gian dang ky': 'Đã hết thời gian đăng ký.',
+  'Chua dang ky cu tri': 'Bạn chưa đăng ký cử tri.',
+  'Da bo phieu roi': 'Bạn đã bỏ phiếu rồi.',
+  'Cuoc bau cu khong ton tai': 'Cuộc bầu cử không tồn tại.',
+  'Cuoc bau cu da ket thuc': 'Cuộc bầu cử đã kết thúc.',
+  'Chi owner moi co quyen': 'Chỉ chủ sở hữu hợp đồng mới có quyền thực hiện.',
+  'Owner khong duoc phep dang ky cu tri': 'Người tổ chức không được phép đăng ký cử tri và bỏ phiếu.',
+  'Da ket thuc roi': 'Cuộc bầu cử đã kết thúc rồi.',
+  'endTime phai lon hon startTime': 'Thời gian kết thúc phải lớn hơn thời gian bắt đầu.',
+  'Ung cu vien khong ton tai': 'Ứng cử viên không tồn tại.',
+  'Chua den thoi gian bo phieu': 'Chưa đến thời gian bỏ phiếu.',
+  'Da het thoi gian bo phieu': 'Đã hết thời gian bỏ phiếu.',
+}
+
 function parseError(err) {
   console.error('[VotingMulti] Transaction error:', err)
-  const reason = err?.reason
+
+  // Try to extract revert reason from deeply nested Ganache error
+  let reason = err?.reason
     ?? err?.revert?.args?.[0]
     ?? err?.info?.error?.message
     ?? err?.info?.error?.data?.message
     ?? err?.error?.message
     ?? err?.error?.data?.message
-    ?? err?.shortMessage
-    ?? err?.message
-    ?? 'Transaction thất bại'
-  return reason.replace(/^execution reverted: ?/i, '').replace(/^Error: /, '') || 'Transaction thất bại'
+    ?? ''
+
+  // Clean up prefixes
+  reason = reason.replace(/^execution reverted: ?/i, '').replace(/^Error: /, '').trim()
+
+  // Try to extract from stringified error data (Ganache sometimes buries it)
+  if (!reason || reason === 'Internal JSON-RPC error.' || reason === 'Internal JSON-RPC error') {
+    try {
+      const errStr = JSON.stringify(err)
+      for (const key of Object.keys(ERROR_MAP)) {
+        if (errStr.includes(key)) return ERROR_MAP[key]
+      }
+    } catch {}
+    // Try nested data object
+    const dataMsg = err?.info?.error?.data?.data?.message
+      ?? err?.error?.data?.data?.message ?? ''
+    reason = dataMsg.replace(/^execution reverted: ?/i, '').replace(/^Error: /, '').trim()
+  }
+
+  // Map to friendly message
+  if (ERROR_MAP[reason]) return ERROR_MAP[reason]
+
+  // Fallback
+  return reason || err?.shortMessage?.replace(/^execution reverted: ?/i, '') || 'Giao dịch thất bại. Vui lòng thử lại.'
 }
 
 // Status labels: 0 = pending, 1 = active, 2 = ended
@@ -85,6 +127,7 @@ export function useVoting() {
       const list = []
       for (let i = 1; i <= count; i++) {
         const [id, name, description, startTime, endTime, candidateCount, status] = await contract.getElectionInfo(i)
+        const vc = Number(await contract.getVoterCount(i))
         const st = Number(startTime), et = Number(endTime)
         const nowSec = Math.floor(Date.now() / 1000)
         list.push({
@@ -94,6 +137,7 @@ export function useVoting() {
           startTime: st,
           endTime: et,
           candidateCount: Number(candidateCount),
+          voterCount: vc,
           status: nowSec < st ? 0 : nowSec <= et ? 1 : 2,
         })
       }
@@ -114,6 +158,7 @@ export function useVoting() {
     try {
       const contract = await getContract()
       const [id, name, description, startTime, endTime, candidateCount, status] = await contract.getElectionInfo(electionId)
+      const vc = Number(await contract.getVoterCount(electionId))
       // Override status bằng thời gian thực (Ganache không tự cập nhật block.timestamp)
       const st = Number(startTime), et = Number(endTime)
       const nowSec = Math.floor(Date.now() / 1000)
@@ -122,7 +167,9 @@ export function useVoting() {
       setCurrentElection({
         id: Number(id), name, description,
         startTime: st, endTime: et,
-        candidateCount: Number(candidateCount), status: realStatus,
+        candidateCount: Number(candidateCount),
+        voterCount: vc,
+        status: realStatus,
       })
 
       const [ids, names, roles, voteCounts] = await contract.getElectionResults(electionId)
@@ -137,7 +184,7 @@ export function useVoting() {
         votes: Number(voteCounts[i]),
         totalVotes: Math.max(total, 1),
         status: elStatus === 1 ? 'active' : 'closed',
-        blockchainId: `${CONTRACT_ADDRESS.slice(0, 6)}...${CONTRACT_ADDRESS.slice(-4)}`,
+        blockchainId: Number(cid),
         avatar: getInitials(names[i]),
         avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
         canVote: false,
@@ -213,10 +260,11 @@ export function useVoting() {
   }, [])
 
   // ── Create election (owner) ────────────────────────────────────────────────
-  const createElection = useCallback(async (name, description, startTime, endTime, { onPending } = {}) => {
+  const createElection = useCallback(async (name, description, startTime, endTime, inviteCode, { onPending } = {}) => {
     try {
+      const inviteCodeHash = keccak256(toUtf8Bytes(inviteCode.trim()))
       const contract = await getContract(true)
-      const tx = await contract.createElection(name, description, startTime, endTime)
+      const tx = await contract.createElection(name, description, startTime, endTime, inviteCodeHash)
       onPending?.()
       const receipt = await tx.wait()
       await fetchElections(walletAddress)
@@ -255,11 +303,12 @@ export function useVoting() {
   }, [walletAddress, fetchElectionData])
 
   // ── Register voter ─────────────────────────────────────────────────────────
-  const registerVoter = useCallback(async (electionId, cccdNumber, { onPending } = {}) => {
+  const registerVoter = useCallback(async (electionId, cccdNumber, inviteCode, { onPending } = {}) => {
     try {
       const cccdHash = keccak256(toUtf8Bytes(cccdNumber.trim()))
+      const inviteCodeHash = keccak256(toUtf8Bytes(inviteCode.trim()))
       const contract = await getContract(true)
-      const tx = await contract.registerVoter(electionId, cccdHash)
+      const tx = await contract.registerVoter(electionId, cccdHash, inviteCodeHash)
       onPending?.()
       const receipt = await tx.wait()
       await fetchElectionData(electionId, walletAddress)
