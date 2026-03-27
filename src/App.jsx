@@ -1,5 +1,7 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import Layout from './components/layout/Layout'
+import ElectionList from './pages/ElectionList'
+import CreateElection from './pages/CreateElection'
 import Dashboard from './pages/Dashboard'
 import CreateProposal from './pages/CreateProposal'
 import RegisterVoter from './pages/RegisterVoter'
@@ -12,13 +14,14 @@ const router = createBrowserRouter([
     path: '/',
     element: <Layout />,
     children: [
-      { index: true, element: <Dashboard /> },
-      { path: 'create', element: <CreateProposal /> },
-      { path: 'register', element: <RegisterVoter /> },
-      { path: 'results', element: <DetailedResults /> },
-      { path: 'history', element: <TransactionHistory /> },
+      { index: true, element: <ElectionList /> },
+      { path: 'elections/new', element: <CreateElection /> },
+      { path: 'elections/:electionId', element: <Dashboard /> },
+      { path: 'elections/:electionId/manage', element: <CreateProposal /> },
+      { path: 'elections/:electionId/register', element: <RegisterVoter /> },
+      { path: 'elections/:electionId/results', element: <DetailedResults /> },
+      { path: 'elections/:electionId/history', element: <TransactionHistory /> },
       { path: 'settings', element: <AccountSettings /> },
-      { path: 'support', element: <Navigate to="/" replace /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

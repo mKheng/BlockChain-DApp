@@ -1,8 +1,16 @@
 import { useOutletContext } from 'react-router-dom'
-import { BarChart2, Users, Trophy, RefreshCw } from 'lucide-react'
+import { BarChart2, Users, Trophy, RefreshCw, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import StatusBadge from '../components/shared/StatusBadge'
 import { CONTRACT_ADDRESS } from '../lib/contract'
+
+function formatDate(ts) {
+  if (!ts) return '—'
+  return new Date(ts * 1000).toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
 
 function OptionSkeleton() {
   return (
@@ -24,11 +32,15 @@ function OptionSkeleton() {
 
 export default function DetailedResults() {
   const {
-    candidates, votingOpen, totalVotesCast,
+    currentElection, candidates, totalVotesCast,
     loadingData, contractError, refreshData,
   } = useOutletContext()
 
-  const winner = !votingOpen && candidates.length > 0
+  const elStatus = currentElection?.status ?? 2
+  const isEnded = elStatus === 2
+  const statusLabel = { 0: 'Sắp diễn ra', 1: 'Đang diễn ra', 2: 'Đã kết thúc' }
+
+  const winner = isEnded && candidates.length > 0
     ? [...candidates].sort((a, b) => b.votes - a.votes)[0]
     : null
 
@@ -49,7 +61,7 @@ export default function DetailedResults() {
           </div>
           <h1 className="text-2xl font-bold text-text-primary tracking-tight">Kết quả chi tiết</h1>
           <p className="text-text-muted text-sm mt-1">
-            Kết quả cuộc bầu cử ghi nhận trực tiếp từ blockchain.
+            Kết quả {currentElection?.name ?? 'cuộc bầu cử'} ghi nhận trực tiếp từ blockchain.
           </p>
         </div>
         <button onClick={refreshData} disabled={loadingData} className="btn-ghost text-xs py-2 shrink-0">
@@ -63,7 +75,7 @@ export default function DetailedResults() {
         {[
           { label: 'Tổng phiếu', value: loadingData ? '...' : totalVotesCast.toLocaleString(), sub: 'Tổng số phiếu đã bỏ' },
           { label: 'Ứng cử viên', value: loadingData ? '...' : candidates.length.toString(), sub: 'Đã đăng ký' },
-          { label: 'Trạng thái', value: votingOpen ? 'Đang mở' : 'Đã đóng', sub: votingOpen ? 'Đang nhận phiếu' : 'Đã kết thúc', valueColor: votingOpen ? 'text-green-chain' : undefined },
+          { label: 'Trạng thái', value: statusLabel[elStatus], sub: currentElection ? formatDate(currentElection.endTime) : '—', valueColor: elStatus === 1 ? 'text-green-chain' : undefined },
         ].map((s) => (
           <div key={s.label} className="bg-surface-600 border border-border rounded-xl p-4">
             <p className="text-text-muted text-xs">{s.label}</p>
@@ -89,28 +101,27 @@ export default function DetailedResults() {
 
       {/* Results card */}
       <div className="bg-surface-600 border border-border rounded-xl overflow-hidden">
-        {/* Card header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
-              <StatusBadge status={votingOpen ? 'active' : 'closed'} />
+              <StatusBadge status={elStatus === 1 ? 'active' : elStatus === 0 ? 'warning' : 'closed'} />
             </div>
-            <h3 className="text-text-primary font-semibold text-sm mt-1">Hệ thống Bỏ phiếu Điện tử</h3>
+            <h3 className="text-text-primary font-semibold text-sm mt-1">{currentElection?.name ?? 'Cuộc bầu cử'}</h3>
             <div className="flex items-center gap-3 text-text-muted text-xs">
               <span className="flex items-center gap-1">
                 <Users className="w-3 h-3" />
                 {totalVotesCast.toLocaleString()} phiếu
               </span>
-              {CONTRACT_ADDRESS && (
-                <span className="font-mono">
-                  {CONTRACT_ADDRESS.slice(0, 6)}...{CONTRACT_ADDRESS.slice(-4)}
+              {currentElection && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatDate(currentElection.startTime)} — {formatDate(currentElection.endTime)}
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Breakdown */}
         <div className="px-5 py-5">
           {loadingData ? (
             <OptionSkeleton />
@@ -126,7 +137,7 @@ export default function DetailedResults() {
                 .sort((a, b) => b.votes - a.votes)
                 .map((c, i) => {
                   const pct = totalVotesCast > 0 ? Math.round((c.votes / totalVotesCast) * 100) : 0
-                  const isWinner = !votingOpen && winner?.id === c.id && c.votes > 0
+                  const isWinner = isEnded && winner?.id === c.id && c.votes > 0
                   return (
                     <div key={c.id} className={clsx(
                       'flex flex-col gap-1.5 p-3 rounded-lg',
@@ -164,7 +175,6 @@ export default function DetailedResults() {
           )}
         </div>
 
-        {/* Footer */}
         {!loadingData && candidates.length > 0 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-border">
             <span className="text-text-muted text-xs">{candidates.length} ứng cử viên</span>

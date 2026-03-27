@@ -1,19 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { Home, Shield, Vote, BarChart2, Settings, HelpCircle, Zap, UserCheck } from 'lucide-react'
+import { Home, Shield, Vote, BarChart2, Settings, HelpCircle, Zap, UserCheck, Plus, ArrowLeft } from 'lucide-react'
 import clsx from 'clsx'
-
-const NAV_ITEMS = [
-  { to: '/',         icon: Home,      label: 'Trang chủ'       },
-  { to: '/create',   icon: Shield,    label: 'Quản trị',       ownerOnly: true },
-  { to: '/register', icon: UserCheck, label: 'Đăng ký Cử tri', voterOnly: true },
-  { to: '/history',  icon: Vote,      label: 'Phiếu của tôi'   },
-  { to: '/results',  icon: BarChart2, label: 'Kết quả'         },
-]
-
-const BOTTOM_ITEMS = [
-  { to: '/settings', icon: Settings,   label: 'Cài đặt' },
-  { to: '/support',  icon: HelpCircle, label: 'Hỗ trợ'  },
-]
 
 function NavItem({ to, icon: Icon, label, end }) {
   return (
@@ -35,10 +22,13 @@ function NavItem({ to, icon: Icon, label, end }) {
   )
 }
 
-export default function Sidebar({ isOwner, walletConnected, walletAddress }) {
+export default function Sidebar({ isOwner, walletConnected, walletAddress, electionId, currentElection }) {
   const shortAddress = walletAddress
     ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
     : ''
+
+  const insideElection = !!electionId
+  const base = `/elections/${electionId}`
 
   return (
     <aside className="w-60 shrink-0 bg-surface-800 border-r border-border flex flex-col h-screen sticky top-0">
@@ -65,18 +55,42 @@ export default function Sidebar({ isOwner, walletConnected, walletAddress }) {
 
       {/* Main nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-0.5">
-        {NAV_ITEMS.map(({ to, icon, label, ownerOnly, voterOnly }) => {
-          if (ownerOnly && !isOwner) return null
-          if (voterOnly && isOwner) return null
-          return <NavItem key={to} to={to} icon={icon} label={label} end={to === '/'} />
-        })}
+        {insideElection ? (
+          <>
+            {/* Back to elections list */}
+            <NavLink
+              to="/"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-muted hover:text-text-secondary hover:bg-white/[0.04] transition-colors mb-2"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Tất cả cuộc bầu cử
+            </NavLink>
+
+            {/* Current election name */}
+            {currentElection && (
+              <div className="px-3 mb-3">
+                <p className="text-text-primary text-sm font-semibold truncate">{currentElection.name}</p>
+                <p className="text-text-muted text-[11px] mt-0.5 truncate">{currentElection.description}</p>
+              </div>
+            )}
+
+            <NavItem to={base} icon={Home} label="Tổng quan" end />
+            {isOwner && <NavItem to={`${base}/manage`} icon={Shield} label="Quản trị" />}
+            {!isOwner && <NavItem to={`${base}/register`} icon={UserCheck} label="Đăng ký Cử tri" />}
+            <NavItem to={`${base}/history`} icon={Vote} label="Phiếu của tôi" />
+            <NavItem to={`${base}/results`} icon={BarChart2} label="Kết quả" />
+          </>
+        ) : (
+          <>
+            <NavItem to="/" icon={Home} label="Cuộc bầu cử" end />
+            {isOwner && <NavItem to="/elections/new" icon={Plus} label="Tạo mới" />}
+          </>
+        )}
       </nav>
 
       {/* Bottom nav */}
       <div className="border-t border-border px-3 py-3 flex flex-col gap-0.5">
-        {BOTTOM_ITEMS.map(({ to, icon, label }) => (
-          <NavItem key={to} to={to} icon={icon} label={label} />
-        ))}
+        <NavItem to="/settings" icon={Settings} label="Cài đặt" />
       </div>
     </aside>
   )
