@@ -1,8 +1,28 @@
 import { useState } from 'react'
 import { useOutletContext, useNavigate } from 'react-router-dom'
-import { Plus, Shield, Lock, Wallet, Calendar, AlertTriangle, X } from 'lucide-react'
+import { Plus, Shield, Lock, Wallet, Calendar, AlertTriangle, X, Clock } from 'lucide-react'
 import clsx from 'clsx'
 import ConfirmTransactionModal from '../components/modals/ConfirmTransactionModal'
+
+// Format Date to datetime-local input value (yyyy-MM-ddTHH:mm)
+function toLocalInput(date) {
+  const d = new Date(date)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function addMinutes(min) {
+  return toLocalInput(Date.now() + min * 60 * 1000)
+}
+
+const DURATION_PRESETS = [
+  { label: '15 phút', minutes: 15 },
+  { label: '30 phút', minutes: 30 },
+  { label: '1 giờ', minutes: 60 },
+  { label: '3 giờ', minutes: 180 },
+  { label: '12 giờ', minutes: 720 },
+  { label: '24 giờ', minutes: 1440 },
+]
 
 export default function CreateElection() {
   const {
@@ -145,6 +165,40 @@ export default function CreateElection() {
                 rows={3}
                 className={clsx(fieldCls('description'), 'resize-none')}
               />
+            </div>
+
+            {/* Quick duration presets */}
+            <div className="flex flex-col gap-2">
+              <label className="text-text-secondary text-sm font-medium flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" /> Chọn nhanh thời lượng
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, startTime: toLocalInput(Date.now()), endTime: '' }))}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium border border-brand/30 text-brand hover:bg-brand/10 transition-colors cursor-pointer"
+                >
+                  Bắt đầu ngay
+                </button>
+                {DURATION_PRESETS.map((p) => (
+                  <button
+                    key={p.minutes}
+                    type="button"
+                    onClick={() => {
+                      const start = form.startTime || toLocalInput(Date.now())
+                      const startMs = new Date(start).getTime()
+                      setForm((f) => ({
+                        ...f,
+                        startTime: start,
+                        endTime: toLocalInput(startMs + p.minutes * 60 * 1000),
+                      }))
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border text-text-secondary hover:border-brand/30 hover:text-brand transition-colors cursor-pointer"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

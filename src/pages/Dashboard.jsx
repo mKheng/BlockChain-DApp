@@ -131,7 +131,7 @@ function CandidateCard({ candidate: c, isVotedByUser, onVote }) {
           {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
         </button>
 
-        <div className="shrink-0">
+        <div className="shrink-0 w-[88px] flex justify-end">
           {c.status === 'closed' ? (
             <StatusBadge status="closed" />
           ) : isVotedByUser ? (
@@ -142,9 +142,7 @@ function CandidateCard({ candidate: c, isVotedByUser, onVote }) {
             <button onClick={() => onVote(c)} className="btn-primary text-xs py-2 px-4">
               Bỏ phiếu
             </button>
-          ) : (
-            <button className="btn-ghost text-xs py-2 px-3">Xem</button>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

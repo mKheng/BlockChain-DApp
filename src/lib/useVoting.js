@@ -31,7 +31,17 @@ async function getContract(withSigner = false) {
 }
 
 function parseError(err) {
-  return err?.reason ?? err?.info?.error?.message ?? err?.shortMessage ?? err?.message ?? 'Transaction thất bại'
+  console.error('[VotingMulti] Transaction error:', err)
+  const reason = err?.reason
+    ?? err?.revert?.args?.[0]
+    ?? err?.info?.error?.message
+    ?? err?.info?.error?.data?.message
+    ?? err?.error?.message
+    ?? err?.error?.data?.message
+    ?? err?.shortMessage
+    ?? err?.message
+    ?? 'Transaction thất bại'
+  return reason.replace(/^execution reverted: ?/i, '').replace(/^Error: /, '') || 'Transaction thất bại'
 }
 
 // Status labels: 0 = pending, 1 = active, 2 = ended
@@ -75,14 +85,16 @@ export function useVoting() {
       const list = []
       for (let i = 1; i <= count; i++) {
         const [id, name, description, startTime, endTime, candidateCount, status] = await contract.getElectionInfo(i)
+        const st = Number(startTime), et = Number(endTime)
+        const nowSec = Math.floor(Date.now() / 1000)
         list.push({
           id: Number(id),
           name,
           description,
-          startTime: Number(startTime),
-          endTime: Number(endTime),
+          startTime: st,
+          endTime: et,
           candidateCount: Number(candidateCount),
-          status: Number(status), // 0=pending, 1=active, 2=ended
+          status: nowSec < st ? 0 : nowSec <= et ? 1 : 2,
         })
       }
       setElections(list)
@@ -102,17 +114,22 @@ export function useVoting() {
     try {
       const contract = await getContract()
       const [id, name, description, startTime, endTime, candidateCount, status] = await contract.getElectionInfo(electionId)
+      // Override status bằng thời gian thực (Ganache không tự cập nhật block.timestamp)
+      const st = Number(startTime), et = Number(endTime)
+      const nowSec = Math.floor(Date.now() / 1000)
+      const realStatus = nowSec < st ? 0 : nowSec <= et ? 1 : 2
+
       setCurrentElection({
         id: Number(id), name, description,
-        startTime: Number(startTime), endTime: Number(endTime),
-        candidateCount: Number(candidateCount), status: Number(status),
+        startTime: st, endTime: et,
+        candidateCount: Number(candidateCount), status: realStatus,
       })
 
       const [ids, names, roles, voteCounts] = await contract.getElectionResults(electionId)
       const total = voteCounts.reduce((s, v) => s + Number(v), 0)
       setTotalVotesCast(total)
 
-      const elStatus = Number(status)
+      const elStatus = realStatus
       const mapped = ids.map((cid, i) => ({
         id: Number(cid),
         name: names[i],
