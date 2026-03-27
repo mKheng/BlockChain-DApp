@@ -6,7 +6,7 @@ import StatusBadge from '../components/shared/StatusBadge'
 
 export default function TransactionHistory() {
   const {
-    walletState, walletAddress, candidates, userVotedFor,
+    walletState, walletAddress, currentElection, candidates, userVotedFor,
     voteHistory, loadingData, onConnectWallet, refreshData,
   } = useOutletContext()
 
@@ -33,7 +33,7 @@ export default function TransactionHistory() {
           </div>
           <h1 className="text-2xl font-bold text-text-primary tracking-tight">Phiếu của tôi</h1>
           <p className="text-text-muted text-sm mt-1">
-            Lịch sử bỏ phiếu được ghi nhận bất biến trên blockchain.
+            Lịch sử bỏ phiếu {currentElection?.name ? `— ${currentElection.name}` : ''} được ghi nhận bất biến trên blockchain.
           </p>
         </div>
         {walletState === 'connected' && (
@@ -66,7 +66,7 @@ export default function TransactionHistory() {
           </div>
           <h2 className="text-text-primary font-bold text-lg">Chưa có giao dịch</h2>
           <p className="text-text-muted text-sm max-w-sm">
-            Bạn chưa bỏ phiếu lần nào. Về trang chủ để tham gia bầu cử.
+            Bạn chưa bỏ phiếu trong cuộc bầu cử này. Về trang tổng quan để tham gia.
           </p>
         </div>
       )}

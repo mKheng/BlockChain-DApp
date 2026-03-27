@@ -30,10 +30,22 @@ async function getContract(withSigner = false) {
   return new Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider)
 }
 
-// Helper lấy error message readable từ ethers v6
 function parseError(err) {
-  return err?.reason ?? err?.info?.error?.message ?? err?.shortMessage ?? err?.message ?? 'Transaction thất bại'
+  console.error('[VotingMulti] Transaction error:', err)
+  const reason = err?.reason
+    ?? err?.revert?.args?.[0]
+    ?? err?.info?.error?.message
+    ?? err?.info?.error?.data?.message
+    ?? err?.error?.message
+    ?? err?.error?.data?.message
+    ?? err?.shortMessage
+    ?? err?.message
+    ?? 'Transaction thất bại'
+  return reason.replace(/^execution reverted: ?/i, '').replace(/^Error: /, '') || 'Transaction thất bại'
 }
+
+// Status labels: 0 = pending, 1 = active, 2 = ended
+export const ELECTION_STATUS = { 0: 'pending', 1: 'active', 2: 'ended' }
 
 // ─────────────────────────────────────────────────────────────────────────────
 export function useVoting() {
@@ -41,46 +53,90 @@ export function useVoting() {
   const [walletAddress, setWalletAddress]   = useState('')
   const [isOwner, setIsOwner]               = useState(false)
 
+  // Election list
+  const [elections, setElections]           = useState([])
+  const [loadingElections, setLoadingElections] = useState(false)
+
+  // Per-election state
+  const [currentElection, setCurrentElection] = useState(null)
   const [candidates, setCandidates]         = useState([])
-  const [votingOpen, setVotingOpen]         = useState(false)
-  const [registrationOpen, setRegistrationOpen] = useState(false)
   const [isRegistered, setIsRegistered]     = useState(false)
   const [userVotedFor, setUserVotedFor]     = useState(null)
   const [totalVotesCast, setTotalVotesCast] = useState(0)
-  const [voteHistory, setVoteHistory]       = useState([]) // [{txHash, blockNumber, candidateId}]
+  const [voteHistory, setVoteHistory]       = useState([])
 
   const [loadingData, setLoadingData]       = useState(false)
   const [contractError, setContractError]   = useState('')
 
-  // ── Fetch tất cả data từ contract ─────────────────────────────────────────
-  const fetchData = useCallback(async (address) => {
+  // ── Fetch all elections ───────────────────────────────────────────────────
+  const fetchElections = useCallback(async (address) => {
     if (!CONTRACT_ADDRESS) {
       setContractError('CONTRACT_ADDRESS chưa được điền. Hãy deploy contract và cập nhật src/lib/contract.js')
       return
     }
     setContractError('')
+    setLoadingElections(true)
+    try {
+      const contract = await getContract()
+      const ownerAddr = await contract.owner()
+      if (address) setIsOwner(ownerAddr.toLowerCase() === address.toLowerCase())
+
+      const count = Number(await contract.electionCount())
+      const list = []
+      for (let i = 1; i <= count; i++) {
+        const [id, name, description, startTime, endTime, candidateCount, status] = await contract.getElectionInfo(i)
+        const st = Number(startTime), et = Number(endTime)
+        const nowSec = Math.floor(Date.now() / 1000)
+        list.push({
+          id: Number(id),
+          name,
+          description,
+          startTime: st,
+          endTime: et,
+          candidateCount: Number(candidateCount),
+          status: nowSec < st ? 0 : nowSec <= et ? 1 : 2,
+        })
+      }
+      setElections(list)
+    } catch (err) {
+      console.error('[useVoting] fetchElections error:', err)
+      setContractError(err.message ?? 'Không thể kết nối contract')
+    } finally {
+      setLoadingElections(false)
+    }
+  }, [])
+
+  // ── Fetch single election data ────────────────────────────────────────────
+  const fetchElectionData = useCallback(async (electionId, address) => {
+    if (!CONTRACT_ADDRESS || !electionId) return
+    setContractError('')
     setLoadingData(true)
     try {
       const contract = await getContract()
-      const [ids, names, roles, voteCounts] = await contract.getResults()
-      const isOpen    = await contract.votingOpen()
-      const regOpen   = await contract.registrationOpen()
-      const ownerAddr = await contract.owner()
+      const [id, name, description, startTime, endTime, candidateCount, status] = await contract.getElectionInfo(electionId)
+      // Override status bằng thời gian thực (Ganache không tự cập nhật block.timestamp)
+      const st = Number(startTime), et = Number(endTime)
+      const nowSec = Math.floor(Date.now() / 1000)
+      const realStatus = nowSec < st ? 0 : nowSec <= et ? 1 : 2
 
-      setVotingOpen(isOpen)
-      setRegistrationOpen(regOpen)
-      if (address) setIsOwner(ownerAddr.toLowerCase() === address.toLowerCase())
+      setCurrentElection({
+        id: Number(id), name, description,
+        startTime: st, endTime: et,
+        candidateCount: Number(candidateCount), status: realStatus,
+      })
 
+      const [ids, names, roles, voteCounts] = await contract.getElectionResults(electionId)
       const total = voteCounts.reduce((s, v) => s + Number(v), 0)
       setTotalVotesCast(total)
 
-      const mapped = ids.map((id, i) => ({
-        id: Number(id),
+      const elStatus = realStatus
+      const mapped = ids.map((cid, i) => ({
+        id: Number(cid),
         name: names[i],
         role: roles[i],
         votes: Number(voteCounts[i]),
         totalVotes: Math.max(total, 1),
-        status: isOpen ? 'active' : 'closed',
+        status: elStatus === 1 ? 'active' : 'closed',
         blockchainId: `${CONTRACT_ADDRESS.slice(0, 6)}...${CONTRACT_ADDRESS.slice(-4)}`,
         avatar: getInitials(names[i]),
         avatarColor: AVATAR_COLORS[i % AVATAR_COLORS.length],
@@ -88,30 +144,26 @@ export function useVoting() {
       }))
 
       if (address) {
-        const registered = await contract.isRegistered(address)
+        const registered = await contract.isRegistered(electionId, address)
         setIsRegistered(registered)
 
-        const voted = await contract.hasVoted(address)
+        const voted = await contract.hasVoted(electionId, address)
         if (voted) {
-          const votedId = Number(await contract.votedFor(address))
+          const votedId = Number(await contract.votedFor(electionId, address))
           setUserVotedFor(votedId)
-          // Lấy lịch sử vote từ blockchain events
           try {
-            const filter = contract.filters.VoteCast(address)
+            const filter = contract.filters.VoteCast(electionId, address)
             const events = await contract.queryFilter(filter)
             setVoteHistory(events.map((e) => ({
-              txHash:      e.transactionHash,
+              txHash: e.transactionHash,
               blockNumber: e.blockNumber,
               candidateId: Number(e.args.candidateId),
             })))
-          } catch {
-            setVoteHistory([])
-          }
+          } catch { setVoteHistory([]) }
         } else {
           setUserVotedFor(null)
           setVoteHistory([])
-          // Chỉ voter đã đăng ký mới có thể vote
-          mapped.forEach((c) => { c.canVote = isOpen && registered })
+          mapped.forEach((c) => { c.canVote = elStatus === 1 && registered })
         }
       } else {
         setIsRegistered(false)
@@ -121,8 +173,8 @@ export function useVoting() {
 
       setCandidates(mapped)
     } catch (err) {
-      console.error('[useVoting] fetchData error:', err)
-      setContractError(err.message ?? 'Không thể kết nối contract')
+      console.error('[useVoting] fetchElectionData error:', err)
+      setContractError(err.message ?? 'Không thể tải dữ liệu cuộc bầu cử')
     } finally {
       setLoadingData(false)
     }
@@ -134,21 +186,18 @@ export function useVoting() {
     setWalletState('connecting')
     try {
       const provider = getProvider()
-      
-      // Buộc MetaMask hiển thị bảng chọn tài khoản bằng cách yêu cầu permissions
       await provider.send("wallet_requestPermissions", [{ eth_accounts: {} }])
-      
       const accounts = await provider.send('eth_requestAccounts', [])
       const address = accounts[0]
       setWalletAddress(address)
       setWalletState('connected')
       localStorage.setItem('wallet_disconnected', 'false')
-      await fetchData(address)
+      await fetchElections(address)
     } catch (err) {
       console.error('[useVoting] connectWallet error:', err)
       setWalletState('disconnected')
     }
-  }, [fetchData])
+  }, [fetchElections])
 
   // ── Disconnect ─────────────────────────────────────────────────────────────
   const disconnectWallet = useCallback(() => {
@@ -157,100 +206,89 @@ export function useVoting() {
     setIsOwner(false)
     setUserVotedFor(null)
     setVoteHistory([])
-    
-    // Delay setting state to 'disconnected' to avoid UI click-through races
-    setTimeout(() => {
-      setWalletState('disconnected')
-    }, 100)
+    setCurrentElection(null)
+    setCandidates([])
+    setElections([])
+    setTimeout(() => { setWalletState('disconnected') }, 100)
+  }, [])
 
-    fetchData(null)
-  }, [fetchData])
-
-  // ── Bỏ phiếu ──────────────────────────────────────────────────────────────
-  const castVote = useCallback(async (candidateId, { onPending } = {}) => {
+  // ── Create election (owner) ────────────────────────────────────────────────
+  const createElection = useCallback(async (name, description, startTime, endTime, { onPending } = {}) => {
     try {
       const contract = await getContract(true)
-      const tx = await contract.vote(candidateId)
+      const tx = await contract.createElection(name, description, startTime, endTime)
       onPending?.()
       const receipt = await tx.wait()
-      await fetchData(walletAddress)
+      await fetchElections(walletAddress)
       return { success: true, hash: receipt.hash ?? tx.hash }
     } catch (err) {
       return { success: false, error: parseError(err) }
     }
-  }, [walletAddress, fetchData])
+  }, [walletAddress, fetchElections])
 
-  // ── Đăng ký ứng cử viên (chỉ owner) ──────────────────────────────────────
-  const registerCandidate = useCallback(async (name, role, { onPending } = {}) => {
+  // ── Force end election (owner) ─────────────────────────────────────────────
+  const forceEndElection = useCallback(async (electionId, { onPending } = {}) => {
     try {
       const contract = await getContract(true)
-      const tx = await contract.registerCandidate(name, role)
+      const tx = await contract.forceEndElection(electionId)
       onPending?.()
       const receipt = await tx.wait()
-      await fetchData(walletAddress)
+      await fetchElections(walletAddress)
       return { success: true, hash: receipt.hash ?? tx.hash }
     } catch (err) {
       return { success: false, error: parseError(err) }
     }
-  }, [walletAddress, fetchData])
+  }, [walletAddress, fetchElections])
 
-  // ── Mở / đóng bầu cử (chỉ owner) ─────────────────────────────────────────
-  const setVotingStatus = useCallback(async (open, { onPending } = {}) => {
+  // ── Add candidate (owner) ──────────────────────────────────────────────────
+  const addCandidate = useCallback(async (electionId, name, role, { onPending } = {}) => {
     try {
       const contract = await getContract(true)
-      const tx = await contract.setVotingStatus(open)
+      const tx = await contract.addCandidate(electionId, name, role)
       onPending?.()
       const receipt = await tx.wait()
-      await fetchData(walletAddress)
+      await fetchElectionData(electionId, walletAddress)
       return { success: true, hash: receipt.hash ?? tx.hash }
     } catch (err) {
       return { success: false, error: parseError(err) }
     }
-  }, [walletAddress, fetchData])
+  }, [walletAddress, fetchElectionData])
 
-  // ── Mở / đóng đăng ký voter (chỉ owner) ──────────────────────────────────
-  const setRegistrationStatus = useCallback(async (open, { onPending } = {}) => {
-    try {
-      const contract = await getContract(true)
-      const tx = await contract.setRegistrationStatus(open)
-      onPending?.()
-      const receipt = await tx.wait()
-      await fetchData(walletAddress)
-      return { success: true, hash: receipt.hash ?? tx.hash }
-    } catch (err) {
-      return { success: false, error: parseError(err) }
-    }
-  }, [walletAddress, fetchData])
-
-  // ── Voter đăng ký bằng CCCD ───────────────────────────────────────────────
-  const registerVoter = useCallback(async (cccdNumber, { onPending } = {}) => {
+  // ── Register voter ─────────────────────────────────────────────────────────
+  const registerVoter = useCallback(async (electionId, cccdNumber, { onPending } = {}) => {
     try {
       const cccdHash = keccak256(toUtf8Bytes(cccdNumber.trim()))
       const contract = await getContract(true)
-      const tx = await contract.registerVoter(cccdHash)
+      const tx = await contract.registerVoter(electionId, cccdHash)
       onPending?.()
       const receipt = await tx.wait()
-      await fetchData(walletAddress)
+      await fetchElectionData(electionId, walletAddress)
       return { success: true, hash: receipt.hash ?? tx.hash }
     } catch (err) {
       return { success: false, error: parseError(err) }
     }
-  }, [walletAddress, fetchData])
+  }, [walletAddress, fetchElectionData])
+
+  // ── Cast vote ──────────────────────────────────────────────────────────────
+  const castVote = useCallback(async (electionId, candidateId, { onPending } = {}) => {
+    try {
+      const contract = await getContract(true)
+      const tx = await contract.vote(electionId, candidateId)
+      onPending?.()
+      const receipt = await tx.wait()
+      await fetchElectionData(electionId, walletAddress)
+      return { success: true, hash: receipt.hash ?? tx.hash }
+    } catch (err) {
+      return { success: false, error: parseError(err) }
+    }
+  }, [walletAddress, fetchElectionData])
 
   // ── Auto-reconnect ─────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      if (!window.ethereum) { 
-        await fetchData(null)
-        return 
-      }
-      
+      if (!window.ethereum) { await fetchElections(null); return }
       const isManualDisconnect = localStorage.getItem('wallet_disconnected') === 'true'
-      if (isManualDisconnect) {
-        await fetchData(null)
-        return
-      }
-
+      if (isManualDisconnect) { await fetchElections(null); return }
       try {
         const provider = getProvider()
         const accounts = await provider.listAccounts()
@@ -258,32 +296,30 @@ export function useVoting() {
           const address = accounts[0].address
           setWalletAddress(address)
           setWalletState('connected')
-          await fetchData(address)
+          await fetchElections(address)
         } else {
-          await fetchData(null)
+          await fetchElections(null)
         }
-      } catch (err) { 
-        await fetchData(null) 
-      }
+      } catch { await fetchElections(null) }
     }
     init()
 
     const onAccountsChanged = (accounts) => {
       const isManualDisconnect = localStorage.getItem('wallet_disconnected') === 'true'
       if (isManualDisconnect) return
-
       if (accounts.length === 0) {
         setWalletState('disconnected')
         setWalletAddress('')
         setIsOwner(false)
         setUserVotedFor(null)
         setVoteHistory([])
-        fetchData(null)
+        setElections([])
+        fetchElections(null)
       } else {
         const address = accounts[0]
         setWalletAddress(address)
         setWalletState('connected')
-        fetchData(address)
+        fetchElections(address)
       }
     }
     const onChainChanged = () => window.location.reload()
@@ -293,15 +329,16 @@ export function useVoting() {
       window.ethereum?.removeListener('accountsChanged', onAccountsChanged)
       window.ethereum?.removeListener('chainChanged', onChainChanged)
     }
-  }, [fetchData])
+  }, [fetchElections])
 
   return {
     walletState, walletAddress, isOwner,
-    candidates, votingOpen, registrationOpen, isRegistered,
-    userVotedFor, totalVotesCast, voteHistory,
+    elections, loadingElections,
+    currentElection, candidates,
+    isRegistered, userVotedFor, totalVotesCast, voteHistory,
     loadingData, contractError,
     connectWallet, disconnectWallet,
-    castVote, registerCandidate, setVotingStatus, setRegistrationStatus, registerVoter,
-    refreshData: () => fetchData(walletAddress),
+    fetchElections, fetchElectionData,
+    createElection, forceEndElection, addCandidate, registerVoter, castVote,
   }
 }

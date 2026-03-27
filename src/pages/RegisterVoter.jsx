@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
-  UserCheck, Wallet, Lock, CheckCircle2, AlertTriangle, X, ShieldCheck,
+  UserCheck, Wallet, Lock, CheckCircle2, AlertTriangle, X, ShieldCheck, Clock,
 } from 'lucide-react'
 import clsx from 'clsx'
 import ConfirmTransactionModal from '../components/modals/ConfirmTransactionModal'
@@ -19,8 +19,8 @@ function ErrorBanner({ error, onDismiss }) {
 
 export default function RegisterVoter() {
   const {
-    walletState, walletAddress,
-    registrationOpen, isRegistered,
+    walletState, walletAddress, electionId,
+    currentElection, isRegistered,
     onConnectWallet, registerVoter,
   } = useOutletContext()
 
@@ -30,6 +30,9 @@ export default function RegisterVoter() {
   const [txState, setTxState]     = useState('idle')
   const [txHash, setTxHash]       = useState('')
   const [txError, setTxError]     = useState('')
+
+  const elStatus = currentElection?.status ?? 2
+  const isActive = elStatus === 1
 
   const validate = () => {
     if (!cccd.trim()) { setCccdError('Vui lòng nhập số CCCD'); return false }
@@ -47,7 +50,7 @@ export default function RegisterVoter() {
 
   const handleConfirm = async () => {
     setTxState('signing')
-    const result = await registerVoter(cccd.trim(), {
+    const result = await registerVoter(electionId, cccd.trim(), {
       onPending: () => setTxState('pending'),
     })
     if (result.success) {
@@ -89,7 +92,7 @@ export default function RegisterVoter() {
           </div>
           <h2 className="text-text-primary font-bold text-lg">Đã đăng ký thành công</h2>
           <p className="text-text-muted text-sm max-w-sm">
-            Ví của bạn đã được xác minh và đủ điều kiện tham gia bỏ phiếu.
+            Ví của bạn đã được xác minh và đủ điều kiện tham gia bỏ phiếu cho cuộc bầu cử này.
           </p>
           <div className="flex items-center gap-2 bg-green-chain/10 border border-green-chain/15 rounded-lg px-3 py-2 mt-1">
             <ShieldCheck className="w-4 h-4 text-green-chain" />
@@ -101,17 +104,21 @@ export default function RegisterVoter() {
     )
   }
 
-  // ── Đóng đăng ký
-  if (!registrationOpen) {
+  // ── Chưa đến thời gian hoặc đã kết thúc
+  if (!isActive) {
     return (
       <div className="p-6 lg:p-8 max-w-xl mx-auto w-full">
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <div className="w-12 h-12 rounded-xl bg-surface-400 flex items-center justify-center">
-            <Lock className="w-6 h-6 text-text-muted" />
+            {elStatus === 0 ? <Clock className="w-6 h-6 text-text-muted" /> : <Lock className="w-6 h-6 text-text-muted" />}
           </div>
-          <h2 className="text-text-primary font-bold text-lg">Đăng ký chưa mở</h2>
+          <h2 className="text-text-primary font-bold text-lg">
+            {elStatus === 0 ? 'Cuộc bầu cử chưa bắt đầu' : 'Cuộc bầu cử đã kết thúc'}
+          </h2>
           <p className="text-text-muted text-sm max-w-sm">
-            Ban tổ chức chưa mở giai đoạn đăng ký cử tri. Vui lòng quay lại sau.
+            {elStatus === 0
+              ? 'Đăng ký cử tri sẽ mở khi cuộc bầu cử bắt đầu. Vui lòng quay lại sau.'
+              : 'Cuộc bầu cử đã kết thúc, không thể đăng ký cử tri.'}
           </p>
         </div>
       </div>
@@ -130,7 +137,8 @@ export default function RegisterVoter() {
         </div>
         <h1 className="text-2xl font-bold text-text-primary tracking-tight">Đăng ký Cử tri</h1>
         <p className="text-text-muted text-sm mt-1">
-          Xác minh danh tính bằng CCCD để được quyền tham gia bỏ phiếu.
+          Xác minh danh tính bằng CCCD để được quyền tham gia bỏ phiếu
+          {currentElection ? ` — ${currentElection.name}` : ''}.
         </p>
       </div>
 

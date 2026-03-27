@@ -1,16 +1,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// BƯỚC 1: Deploy Voting.sol trên Remix IDE
-//   - Chọn Environment: "Injected Provider - MetaMask" → kết nối Ganache
-//   - Click Deploy → MetaMask popup → xác nhận
+// BƯỚC 1: Deploy VotingMulti.sol trên Remix IDE
+//   - Chọn Environment: "Custom - External Http Provider" → http://127.0.0.1:7545
+//   - Click Deploy → xác nhận
 //
 // BƯỚC 2: Dán địa chỉ contract vào CONTRACT_ADDRESS bên dưới
-//   (ví dụ: '0xd9145CCE52D386f254917e481eB44e9943F39138')
 //
-// BƯỚC 3: Dán ABI vào CONTRACT_ABI bên dưới
-//   Remix IDE → tab Solidity Compiler → "Compilation Details" → copy "ABI"
+// BƯỚC 3: ABI đã được cập nhật sẵn cho VotingMulti.sol
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CONTRACT_ADDRESS = '0xCdA876f0Be6995C2Ad9798AE40128C1B0B9C13e3' // ← Điền địa chỉ contract MỚI sau khi redeploy
+export const CONTRACT_ADDRESS = '0xc82Df3BE1816bC541BF3FC414fA412849e858488' // ← Điền địa chỉ contract MỚI sau khi deploy VotingMulti.sol
 
 export const CONTRACT_ABI = [
   // ── Constructor ─────────────────────────────────────────────────────────────
@@ -20,8 +18,20 @@ export const CONTRACT_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true,  internalType: 'uint256', name: 'id',   type: 'uint256' },
-      { indexed: false, internalType: 'string',  name: 'name', type: 'string'  },
+      { indexed: true, internalType: 'uint256', name: 'id', type: 'uint256' },
+      { indexed: false, internalType: 'string', name: 'name', type: 'string' },
+      { indexed: false, internalType: 'uint256', name: 'startTime', type: 'uint256' },
+      { indexed: false, internalType: 'uint256', name: 'endTime', type: 'uint256' },
+    ],
+    name: 'ElectionCreated',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'uint256', name: 'electionId', type: 'uint256' },
+      { indexed: true, internalType: 'uint256', name: 'candidateId', type: 'uint256' },
+      { indexed: false, internalType: 'string', name: 'name', type: 'string' },
     ],
     name: 'CandidateRegistered',
     type: 'event',
@@ -29,7 +39,18 @@ export const CONTRACT_ABI = [
   {
     anonymous: false,
     inputs: [
-      { indexed: true, internalType: 'address', name: 'voter',       type: 'address' },
+      { indexed: true, internalType: 'uint256', name: 'electionId', type: 'uint256' },
+      { indexed: true, internalType: 'address', name: 'voter', type: 'address' },
+      { indexed: false, internalType: 'bytes32', name: 'cccdHash', type: 'bytes32' },
+    ],
+    name: 'VoterRegistered',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'uint256', name: 'electionId', type: 'uint256' },
+      { indexed: true, internalType: 'address', name: 'voter', type: 'address' },
       { indexed: true, internalType: 'uint256', name: 'candidateId', type: 'uint256' },
     ],
     name: 'VoteCast',
@@ -37,80 +58,14 @@ export const CONTRACT_ABI = [
   },
   {
     anonymous: false,
-    inputs: [{ indexed: false, internalType: 'bool', name: 'isOpen', type: 'bool' }],
-    name: 'VotingStatusChanged',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [{ indexed: false, internalType: 'bool', name: 'isOpen', type: 'bool' }],
-    name: 'RegistrationStatusChanged',
-    type: 'event',
-  },
-  {
-    anonymous: false,
     inputs: [
-      { indexed: true,  internalType: 'address', name: 'voter',    type: 'address' },
-      { indexed: false, internalType: 'bytes32', name: 'cccdHash', type: 'bytes32' },
+      { indexed: true, internalType: 'uint256', name: 'electionId', type: 'uint256' },
     ],
-    name: 'VoterRegistered',
+    name: 'ElectionForceEnded',
     type: 'event',
   },
 
   // ── View functions ───────────────────────────────────────────────────────────
-  {
-    inputs: [],
-    name: 'candidateCount',
-    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
-    name: 'candidates',
-    outputs: [
-      { internalType: 'uint256', name: 'id',        type: 'uint256' },
-      { internalType: 'string',  name: 'name',      type: 'string'  },
-      { internalType: 'string',  name: 'role',      type: 'string'  },
-      { internalType: 'uint256', name: 'voteCount', type: 'uint256' },
-      { internalType: 'bool',    name: 'exists',    type: 'bool'    },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'getResults',
-    outputs: [
-      { internalType: 'uint256[]', name: 'ids',        type: 'uint256[]' },
-      { internalType: 'string[]',  name: 'names',      type: 'string[]'  },
-      { internalType: 'string[]',  name: 'roles',      type: 'string[]'  },
-      { internalType: 'uint256[]', name: 'voteCounts', type: 'uint256[]' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ internalType: 'address', name: '', type: 'address' }],
-    name: 'hasVoted',
-    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ internalType: 'address', name: '', type: 'address' }],
-    name: 'isRegistered',
-    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
-    name: 'cccdUsed',
-    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
   {
     inputs: [],
     name: 'owner',
@@ -120,67 +75,122 @@ export const CONTRACT_ABI = [
   },
   {
     inputs: [],
-    name: 'votingOpen',
-    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [],
-    name: 'registrationOpen',
-    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
-    inputs: [{ internalType: 'address', name: '', type: 'address' }],
-    name: 'votedFor',
+    name: 'electionCount',
     outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'address', name: '', type: 'address' }],
-    name: 'voterCCCD',
-    outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+    inputs: [{ internalType: 'uint256', name: '_electionId', type: 'uint256' }],
+    name: 'getElectionStatus',
+    outputs: [{ internalType: 'uint8', name: '', type: 'uint8' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: '_electionId', type: 'uint256' }],
+    name: 'getElectionInfo',
+    outputs: [
+      { internalType: 'uint256', name: 'id', type: 'uint256' },
+      { internalType: 'string', name: 'name', type: 'string' },
+      { internalType: 'string', name: 'description', type: 'string' },
+      { internalType: 'uint256', name: 'startTime', type: 'uint256' },
+      { internalType: 'uint256', name: 'endTime', type: 'uint256' },
+      { internalType: 'uint256', name: 'candidateCount', type: 'uint256' },
+      { internalType: 'uint8', name: 'status', type: 'uint8' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [{ internalType: 'uint256', name: '_electionId', type: 'uint256' }],
+    name: 'getElectionResults',
+    outputs: [
+      { internalType: 'uint256[]', name: 'ids', type: 'uint256[]' },
+      { internalType: 'string[]', name: 'names', type: 'string[]' },
+      { internalType: 'string[]', name: 'roles', type: 'string[]' },
+      { internalType: 'uint256[]', name: 'voteCounts', type: 'uint256[]' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'uint256', name: '', type: 'uint256' },
+      { internalType: 'address', name: '', type: 'address' },
+    ],
+    name: 'isRegistered',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'uint256', name: '', type: 'uint256' },
+      { internalType: 'address', name: '', type: 'address' },
+    ],
+    name: 'hasVoted',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'uint256', name: '', type: 'uint256' },
+      { internalType: 'address', name: '', type: 'address' },
+    ],
+    name: 'votedFor',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
     stateMutability: 'view',
     type: 'function',
   },
 
   // ── Write functions ──────────────────────────────────────────────────────────
   {
-    inputs: [{ internalType: 'bytes32', name: 'cccdHash', type: 'bytes32' }],
-    name: 'registerVoter',
+    inputs: [
+      { internalType: 'string', name: '_name', type: 'string' },
+      { internalType: 'string', name: '_description', type: 'string' },
+      { internalType: 'uint256', name: '_startTime', type: 'uint256' },
+      { internalType: 'uint256', name: '_endTime', type: 'uint256' },
+    ],
+    name: 'createElection',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'bool', name: '_open', type: 'bool' }],
-    name: 'setRegistrationStatus',
+    inputs: [{ internalType: 'uint256', name: '_electionId', type: 'uint256' }],
+    name: 'forceEndElection',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
   },
   {
     inputs: [
+      { internalType: 'uint256', name: '_electionId', type: 'uint256' },
       { internalType: 'string', name: '_name', type: 'string' },
       { internalType: 'string', name: '_role', type: 'string' },
     ],
-    name: 'registerCandidate',
+    name: 'addCandidate',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'bool', name: '_open', type: 'bool' }],
-    name: 'setVotingStatus',
+    inputs: [
+      { internalType: 'uint256', name: '_electionId', type: 'uint256' },
+      { internalType: 'bytes32', name: '_cccdHash', type: 'bytes32' },
+    ],
+    name: 'registerVoter',
     outputs: [],
     stateMutability: 'nonpayable',
     type: 'function',
   },
   {
-    inputs: [{ internalType: 'uint256', name: '_candidateId', type: 'uint256' }],
+    inputs: [
+      { internalType: 'uint256', name: '_electionId', type: 'uint256' },
+      { internalType: 'uint256', name: '_candidateId', type: 'uint256' },
+    ],
     name: 'vote',
     outputs: [],
     stateMutability: 'nonpayable',
